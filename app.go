@@ -22,7 +22,7 @@ var (
 
 func serve(n *commando.Node) error {
 	cnf := config.Load()
-	fmt.Printf("Neko Engine %s-%s (%s)\n", version, branch, hash)
+	fmt.Printf("Starting neko engine v%s-%s (%s)...\n", version, branch, hash)
 	debug, _ := option.ParseBool(*n.MustGetOpt("debug"), n)
 	gin.SetMode(gin.ReleaseMode)
 	config.Debug = false
@@ -34,6 +34,7 @@ func serve(n *commando.Node) error {
 	app := gin.Default()
 	routes.New(app)
 
+	fmt.Printf("neko engine server bind at http://%s:%d\n", cnf.Server.Host, cnf.Server.Port)
 	if err := app.Run(fmt.Sprintf("%s:%d", cnf.Server.Host, cnf.Server.Port)); err != nil {
 		return err
 	}
@@ -42,7 +43,7 @@ func serve(n *commando.Node) error {
 }
 
 func versionCheck(n *commando.Node) error {
-	fmt.Printf("neko-engine v%s %s(%s)\n", version, branch, hash)
+	fmt.Printf("neko-engine v%s %s (%s)\n", version, branch, hash)
 
 	return nil
 }
