@@ -116,16 +116,17 @@ func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (stri
 	}
 	history += "</HISTORY_METADATA>\n"
 
-	var err error
-	buf, _ := os.ReadFile("prompt.txt")
-	if req.Info.NSFW {
-		buf, err = os.ReadFile("prompt-nsfw.txt")
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "nsfw prompt is not served.\n")
-		}
+	var prompt string
+	pcnf := config.LoadPrompt()
+	if pcnf == nil {
+		return "", nil, fmt.Errorf("prompt config is not loaded")
 	}
 
-	prompt := string(buf)
+	prompt = pcnf.Default
+	if pcnf.NSFW != "" {
+		prompt = pcnf.NSFW
+	}
+
 	query := prompt + "\n" + id + context + mem + history
 	parts = append(parts, genai.NewPartFromText(req.Content))
 

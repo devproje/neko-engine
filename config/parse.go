@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -46,14 +47,37 @@ type GeminiConfig struct {
 	Token string `toml:"token"`
 }
 
+type PromptConfig struct {
+	Default string `toml:"default"`
+	NSFW    string `toml:"nsfw"`
+}
+
 var (
-	Debug bool
+	Debug      bool
+	ConfigPath string
 )
 
+func init() {
+	ConfigPath = "./neko-data"
+
+	pathEnv := os.Getenv("NEKO_PATH")
+	if pathEnv != "" {
+		ConfigPath = fmt.Sprintf("%s/neko-data", pathEnv)
+	}
+
+	if _, err := os.ReadDir(ConfigPath); err != nil {
+		err = os.Mkdir(ConfigPath, 0644)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
 func Load() *Config {
-	buf, err := os.ReadFile("config.toml")
+	buf, err := os.ReadFile(filepath.Join(ConfigPath, "config.toml"))
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "config.toml is not created!\n")
+		_, _ = fmt.Fprintf(os.Stderr, "config.toml is not found!\n")
 		return nil
 	}
 
@@ -64,4 +88,20 @@ func Load() *Config {
 	}
 
 	return &config
+}
+
+func LoadPrompt() *PromptConfig {
+	buf, err := os.ReadFile(filepath.Join(ConfigPath, "prompt.toml"))
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "prompt.toml is not found!\n")
+		return nil
+	}
+
+	var prompt PromptConfig
+	if err = toml.Unmarshal(buf, &prompt); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		return nil
+	}
+
+	return &prompt
 }
