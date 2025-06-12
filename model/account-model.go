@@ -28,22 +28,28 @@ var (
 	UserRole Role = Role{
 		Id:    1,
 		Name:  "user",
-		Limit: -1,
+		Limit: 35,
 		Admin: false,
 	}
 	ServerRole Role = Role{
 		Id:    2,
 		Name:  "server",
-		Limit: -1,
+		Limit: 60,
 		Admin: false,
 	}
 )
 
-func NewAccount(id, name string) *Account {
+func NewAccount(id, name string, server bool) *Account {
 	return &Account{
 		Id:     id,
 		Author: name,
-		Role:   ServerRole,
+		Role: func() Role {
+			if server {
+				return ServerRole
+			}
+
+			return UserRole
+		}(),
 	}
 }
 

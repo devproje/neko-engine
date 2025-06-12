@@ -154,12 +154,17 @@ func (cc *ChatController) Hit(ctx *gin.Context) {
 
 	acc, err := cc.Account.Read(req.Id)
 	if err != nil {
-		if err = cc.Account.Create(model.NewAccount(req.Id, req.Author)); err != nil {
-			ctx.JSON(500, gin.H{"errno": "account creation failed"})
+		ctx.JSON(401, gin.H{"errno": "account is not registered"})
+		return
+	}
+
+	if acc.Role.Id != model.RootRole.Id {
+		if acc.Count > acc.Role.Limit {
+			ctx.JSON(200, gin.H{
+				"answer": "오늘의 사용한도를 초과 했어요. 내일 다시 시도 해주세요!",
+			})
 			return
 		}
-		ctx.JSON(401, gin.H{"errno": "account created, retry request"})
-		return
 	}
 
 	query, parts, err := cc.composePrompt(&req, acc)
