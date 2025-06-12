@@ -1,0 +1,23 @@
+[bot]
+token = ""
+client-id = ""
+client-secret = ""
+redirect-uri = ""
+official-server-id = ""
+
+[server]
+host = "0.0.0.0"
+port = 3000
+
+# please generate secret key use gen-secret.sh script.
+secret = ""
+
+[database]
+host = "127.0.0.1"
+port = 3306
+name = "neko-service"
+username = "<mariadb_username>"
+password = "<mariadb_password>"
+
+[gemini]
+token = ""

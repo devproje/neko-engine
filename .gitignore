@@ -1,0 +1,20 @@
+*~
+.idea
+.vscode/
+*.swp
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# configure
+config.toml
+config.*.toml
+!config.sample.toml
+
+*.bak
+prompt.txt
+prompt-bak/
+prompt-*.txt
+prompt.*.bak
+
+neko-engine
