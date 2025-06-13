@@ -12,17 +12,14 @@ type Config struct {
 	Bot      BotConfig      `toml:"bot"`
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
-	OpenAI   OpenAIConfig   `toml:"openai"`
 	Gemini   GeminiConfig   `toml:"gemini"`
 }
 
 type BotConfig struct {
-	Token              string `toml:"token"`
-	ClientId           string `toml:"client-id"`
-	ClientSecret       string `toml:"client-secret"`
-	RedirectURI        string `toml:"redirect-uri"`
-	OfficialServerId   string `toml:"official-server-id"`
-	ExperminalServerId string `toml:"experminal-server-id"`
+	ClientId         string `toml:"client-id"`
+	ClientSecret     string `toml:"client-secret"`
+	RedirectURI      string `toml:"redirect-uri"`
+	OfficialServerId string `toml:"official-server-id"`
 }
 
 type ServerConfig struct {
@@ -39,18 +36,46 @@ type DatabaseConfig struct {
 	Password string `toml:"password"`
 }
 
-type OpenAIConfig struct {
-	Token string `toml:"token"`
-}
-
 type GeminiConfig struct {
 	Token string `toml:"token"`
 }
 
 type PromptConfig struct {
+	Model   string `toml:"model"`
 	Default string `toml:"default"`
 	NSFW    string `toml:"nsfw"`
 }
+
+const (
+	CONFIG_DEFAULT_BUF = `[bot]
+client-id = "<discord client id>"
+client-secret = "<discord client secret>"
+redirect-uri = "<discord callback url>"
+official-server-id = "<official discord server id>"
+
+[server]
+host = "0.0.0.0"
+port = 3000
+
+# please generate secret key and paste for gen-secret.sh script.
+secret = ""
+
+[database]
+host = "127.0.0.1"
+port = 3306
+name = "neko-engine"
+username = "<mariadb_username>"
+password = "<mariadb_password>"
+
+[gemini]
+token = ""
+`
+	MODEL_DEFAULT_BUF = `model = ""
+default = "<general_prompt>"
+# NSFW only prompt. If you set this variable to empty, it will automatically fallback to the default prompt.
+nsfw = ""
+`
+)
 
 var (
 	Debug      bool
@@ -66,7 +91,7 @@ func init() {
 	}
 
 	if _, err := os.ReadDir(ConfigPath); err != nil {
-		err = os.Mkdir(ConfigPath, 0644)
+		err = os.Mkdir(ConfigPath, 0755)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -78,6 +103,8 @@ func Load() *Config {
 	buf, err := os.ReadFile(filepath.Join(ConfigPath, "config.toml"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "config.toml is not found!\n")
+		_ = os.WriteFile(filepath.Join(ConfigPath, "config.toml"), []byte(CONFIG_DEFAULT_BUF), 0644)
+
 		return nil
 	}
 
@@ -94,6 +121,8 @@ func LoadPrompt() *PromptConfig {
 	buf, err := os.ReadFile(filepath.Join(ConfigPath, "prompt.toml"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "prompt.toml is not found!\n")
+		_ = os.WriteFile(filepath.Join(ConfigPath, "prompt.toml"), []byte(MODEL_DEFAULT_BUF), 0644)
+
 		return nil
 	}
 

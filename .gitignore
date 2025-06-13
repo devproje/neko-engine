@@ -16,5 +16,7 @@ prompt.txt
 prompt-bak/
 prompt-*.txt
 prompt.*.bak
+prompt.toml
+!prompt.sample.toml
 
 neko-engine

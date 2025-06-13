@@ -123,7 +123,7 @@ func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (stri
 	}
 
 	prompt = pcnf.Default
-	if pcnf.NSFW != "" {
+	if pcnf.NSFW != "" && req.Info.NSFW {
 		prompt = pcnf.NSFW
 	}
 
@@ -142,6 +142,7 @@ func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (stri
 }
 
 func (cc *ChatController) Hit(ctx *gin.Context) {
+	pcnf := config.LoadPrompt()
 	if ok := middleware.CheckBot(ctx); !ok {
 		return
 	}
@@ -175,7 +176,7 @@ func (cc *ChatController) Hit(ctx *gin.Context) {
 	}
 
 	prompts := []*genai.Content{genai.NewContentFromParts(parts, genai.RoleUser)}
-	resp, err := cc.Gemini.SendPrompt(query, "gemini-2.5-pro-preview-06-05", prompts)
+	resp, err := cc.Gemini.SendPrompt(query, pcnf.Model, prompts)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		ctx.JSON(500, gin.H{"errno": "Gemini response error"})
