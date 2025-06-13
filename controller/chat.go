@@ -88,9 +88,10 @@ func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (stri
 
 	id := fmt.Sprintf("<USER_PROFILE>\nUser's name is %s and ID is %s.\n</USER_PROFILE>\n\n", req.Author, req.Id)
 	context := fmt.Sprintf(
-		"<CURRENT_CONTEXT>\nCurrent time is %s. Channel: %s.\n</CURRENT_CONTEXT>\n\n",
+		"<CURRENT_CONTEXT>\nCurrent time is %s and current channel is %s.\ncurrent affinity score is %d\n</CURRENT_CONTEXT>\n\n",
 		time.Now().In(time.FixedZone("KST", 9*60*60)).Format("2006-01-02 15:04:05"),
 		req.Info.CID,
+		acc.Sentiment,
 	)
 
 	memories, _ := cc.Memory.Read(acc)
@@ -202,10 +203,13 @@ func (cc *ChatController) Hit(ctx *gin.Context) {
 		genai.NewContentFromText(fmt.Sprintf("user: %s\nbot: %s\n", req.Content, resp.Text()), genai.RoleUser),
 	}
 
-	memory, _ := cc.Gemini.AbstractDataFromLLM(acc, compose)
+	memory, score, _ := cc.Gemini.AbstractDataFromLLM(acc, compose)
 	if indicator, err = cc.Memory.SaveOrUpdate(acc, memory); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+	}
+
+	if err = cc.Account.UpdateSentiment(acc, score); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
 
 	cc.History.AppendLog(acc, req.Content, resp.Text(), req.Info.CID, req.Info.GID, req.Info.NSFW)
@@ -215,9 +219,9 @@ func (cc *ChatController) Hit(ctx *gin.Context) {
 	)
 
 	if indicator != "" {
-		indicator += fmt.Sprintf("\n`⏲️ 응답시간 (%.2fs)`", time.Since(start).Seconds())
+		indicator += fmt.Sprintf("\n`⏲️ 응답시간 (%.2fs), 호감도 반영: %d`", time.Since(start).Seconds(), score)
 	} else {
-		indicator = fmt.Sprintf("\n`⏲️ 응답시간 (%.2fs)`", time.Since(start).Seconds())
+		indicator = fmt.Sprintf("\n`⏲️ 응답시간 (%.2fs), 호감도 반영: %d`", time.Since(start).Seconds(), score)
 	}
 
 	ctx.JSON(200, gin.H{

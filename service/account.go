@@ -34,6 +34,7 @@ func init() {
 		prompt  	TEXT 		DEFAULT     '',
 		count		INT 		NOT NULL	DEFAULT 	0,
 		total		INT 		NOT NULL 	DEFAULT 	0,
+		sentiment	INT			NOT NULL	DEFALUT		0,
 		created_at 	DATETIME	DEFAULT		CURRENT_TIMESTAMP,
 		updated_at	DATETIME    DEFAULT		CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 		constraint	PK_Account	PRIMARY KEY (id)
@@ -96,7 +97,7 @@ func (*AccountService) Read(id string) (*model.Account, error) {
 	var roleId int
 	var acc model.Account
 
-	if err = rows.Scan(&acc.Id, &acc.Author, &roleId, &acc.Prompt, &acc.Count, &acc.Total, &acc.CreatedAt, &acc.UpdatedAt); err != nil {
+	if err = rows.Scan(&acc.Id, &acc.Author, &roleId, &acc.Prompt, &acc.Count, &acc.Total, &acc.Sentiment, &acc.CreatedAt, &acc.UpdatedAt); err != nil {
 		return nil, err
 	}
 
@@ -163,6 +164,46 @@ func (*AccountService) UpdateRole(acc *model.Account, roleId int) error {
 	defer stmt.Close()
 
 	if _, err = stmt.Exec(roleId, acc.Id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (*AccountService) UpdateSentiment(acc *model.Account, score int) error {
+	db := utils.NewDatabase()
+
+	const SENTIMENT_MAX = 250
+	const SENTIMENT_MIN = -250
+
+	var clampScore = func() int {
+		if (acc.Sentiment + score) > SENTIMENT_MAX {
+			fmt.Printf("sentiment score is overflowed: %d\n", acc.Sentiment+score)
+			return SENTIMENT_MAX
+		}
+
+		if (acc.Sentiment + score) < SENTIMENT_MIN {
+			fmt.Printf("sentiment score is overflowed: %d\n", acc.Sentiment+score)
+			return SENTIMENT_MIN
+		}
+
+		fmt.Printf("sentiment score is saved to: %d\n", acc.Sentiment+score)
+		return acc.Sentiment + score
+	}
+
+	conn, err := db.Open()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	stmt, err := conn.Prepare("update accounts set sentiment = ? where id = ?;")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	if _, err = stmt.Exec(clampScore(), acc.Id); err != nil {
 		return err
 	}
 

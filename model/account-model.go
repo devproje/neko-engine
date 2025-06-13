@@ -7,6 +7,7 @@ type Account struct {
 	Prompt    string `json:"prompt"`
 	Count     int    `json:"count"`
 	Total     int    `json:"total"`
+	Sentiment int    `json:"sentiment_score"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
