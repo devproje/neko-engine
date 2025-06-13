@@ -34,7 +34,7 @@ func init() {
 		prompt  	TEXT 		DEFAULT     '',
 		count		INT 		NOT NULL	DEFAULT 	0,
 		total		INT 		NOT NULL 	DEFAULT 	0,
-		sentiment	INT			NOT NULL	DEFALUT		0,
+		sentiment	INT			NOT NULL	DEFAULT		0,
 		created_at 	DATETIME	DEFAULT		CURRENT_TIMESTAMP,
 		updated_at	DATETIME    DEFAULT		CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 		constraint	PK_Account	PRIMARY KEY (id)
