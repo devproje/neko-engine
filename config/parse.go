@@ -70,7 +70,7 @@ password = "<mariadb_password>"
 [gemini]
 token = ""
 `
-	MODEL_DEFAULT_BUF = `model = ""
+	MODEL_DEFAULT_BUF = `model = "gemini-2.5-pro-preview-06-05"
 default = "<general_prompt>"
 # NSFW only prompt. If you set this variable to empty, it will automatically fallback to the default prompt.
 nsfw = ""
