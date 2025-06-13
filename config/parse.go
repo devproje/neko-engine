@@ -13,6 +13,7 @@ type Config struct {
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
 	Gemini   GeminiConfig   `toml:"gemini"`
+	Memory   MemoryConfig   `toml:"memory"`
 }
 
 type BotConfig struct {
@@ -38,6 +39,10 @@ type DatabaseConfig struct {
 
 type GeminiConfig struct {
 	Token string `toml:"token"`
+}
+
+type MemoryConfig struct {
+	SharedMemory bool `toml:"shared-memory"`
 }
 
 type PromptConfig struct {
@@ -69,6 +74,9 @@ password = "<mariadb_password>"
 
 [gemini]
 token = ""
+
+[memory]
+shared-memory = false
 `
 	MODEL_DEFAULT_BUF = `model = "gemini-2.5-pro-preview-06-05"
 default = "<general_prompt>"

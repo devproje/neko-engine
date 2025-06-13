@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/devproje/neko-engine/config"
 	"github.com/devproje/neko-engine/model"
 	"github.com/devproje/neko-engine/utils"
 )
@@ -164,7 +165,7 @@ func (ms *MemoryService) enforceMemoryLimit(userID string) error {
 	return nil
 }
 
-func (ms *MemoryService) Read(acc *model.Account) ([]*Memory, error) {
+func (ms *MemoryService) Read(acc *model.Account, keyword ...string) ([]*Memory, error) {
 	db := utils.NewDatabase()
 	conn, err := db.Open()
 	if err != nil {
@@ -172,13 +173,37 @@ func (ms *MemoryService) Read(acc *model.Account) ([]*Memory, error) {
 	}
 	defer conn.Close()
 
-	stmt, err := conn.Prepare("SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? ORDER BY updated_at;")
+	cfg := config.Load()
+	var query string
+	var args []any
+
+	if len(keyword) > 0 && keyword[0] != "" {
+		if cfg != nil && cfg.Memory.SharedMemory {
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE (mem_key LIKE ? OR content LIKE ?) ORDER BY updated_at;"
+			searchTerm := "%" + keyword[0] + "%"
+			args = []any{searchTerm, searchTerm}
+		} else {
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? AND (mem_key LIKE ? OR content LIKE ?) ORDER BY updated_at;"
+			searchTerm := "%" + keyword[0] + "%"
+			args = []any{acc.Id, searchTerm, searchTerm}
+		}
+	} else {
+		if cfg != nil && cfg.Memory.SharedMemory {
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory ORDER BY updated_at;"
+			args = []any{}
+		} else {
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? ORDER BY updated_at;"
+			args = []any{acc.Id}
+		}
+	}
+
+	stmt, err := conn.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(acc.Id)
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
