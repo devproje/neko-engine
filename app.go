@@ -32,6 +32,18 @@ func serve(n *commando.Node) error {
 	}
 
 	app := gin.Default()
+
+	// serve frontend when public/ directory is exist
+	if _, err := os.Stat("public/"); err == nil {
+		app.Static("/assets", "./public/assets")
+		app.Static("/static", "./public")
+		app.StaticFile("/", "./public/index.html")
+
+		app.NoRoute(func(c *gin.Context) {
+			c.File("./public/index.html")
+		})
+	}
+
 	routes.New(app)
 
 	fmt.Printf("neko engine server bind at http://%s:%d\n", cnf.Server.Host, cnf.Server.Port)
