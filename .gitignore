@@ -20,3 +20,4 @@ prompt.toml
 !prompt.sample.toml
 
 neko-engine
+neko-data/

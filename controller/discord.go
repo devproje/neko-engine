@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/devproje/neko-engine/config"
+	"github.com/devproje/neko-engine/model"
 	"github.com/devproje/neko-engine/service"
 	"github.com/gin-gonic/gin"
 )
@@ -59,6 +60,26 @@ func (ac *AccountController) ReadAccount(ctx *gin.Context) {
 }
 
 func (ac *AccountController) AddDiscordApp(ctx *gin.Context) {
+	if config.Debug {
+		id := ctx.Query("id")
+		name := ctx.Query("name")
+
+		if err := ac.Account.Create(&model.Account{
+			Id:     id,
+			Author: name,
+		}); err != nil {
+			ctx.JSON(500, gin.H{
+				"errno": "API handle error",
+			})
+			return
+		}
+
+		ctx.JSON(200, gin.H{
+			"message": "가입완료!",
+		})
+		return
+	}
+
 	link := ac.genLink("identify guilds", 1)
 	fmt.Println(link)
 	ctx.Redirect(302, link)
