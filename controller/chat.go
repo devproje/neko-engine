@@ -203,7 +203,7 @@ func (cc *ChatController) Hit(ctx *gin.Context) {
 		genai.NewContentFromText(fmt.Sprintf("user: %s\nbot: %s\n", req.Content, resp.Text()), genai.RoleUser),
 	}
 
-	memory, score, _ := cc.Gemini.AbstractDataFromLLM(acc, compose)
+	memory, score, _ := cc.Gemini.AbstractDataFromLLM(acc, compose, req.Info.NSFW)
 	if indicator, err = cc.Memory.SaveOrUpdate(acc, memory); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 	}

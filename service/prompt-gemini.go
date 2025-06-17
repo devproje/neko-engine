@@ -56,8 +56,9 @@ func (*GeminiService) SendPrompt(system, model string, prompts []*genai.Content)
 	return result, nil
 }
 
-func (*GeminiService) AbstractDataFromLLM(acc *model.Account, prompt []*genai.Content) (*Memory, int, error) {
+func (*GeminiService) AbstractDataFromLLM(acc *model.Account, prompt []*genai.Content, nsfw bool) (*Memory, int, error) {
 	cnf := config.Load()
+	persona := config.LoadPrompt()
 	client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
 		APIKey:  cnf.Gemini.Token,
 		Backend: genai.BackendGeminiAPI,
@@ -65,6 +66,13 @@ func (*GeminiService) AbstractDataFromLLM(acc *model.Account, prompt []*genai.Co
 	if err != nil {
 		fmt.Printf("[MemoryService] 기억저장 거부\n")
 		return nil, 0, err
+	}
+
+	ret := persona.Default
+	if nsfw {
+		if persona.NSFW != "" {
+			ret = persona.NSFW
+		}
 	}
 
 	system := "The input below contains the user's core information.\n\n"
@@ -86,6 +94,7 @@ func (*GeminiService) AbstractDataFromLLM(acc *model.Account, prompt []*genai.Co
 	system += "  * If memory is not worth saving, return empty key and content but ALWAYS include sentiment_score.\n\n"
 	system += "Example:\n"
 	system += "{ \"key\": \"취미\", \"content\": \"사용자는 앵무새를 보는것이 취미이다.\", \"importance\": 5, \"sentiment_score\": 3 }\n"
+	system += fmt.Sprintf("\n\nThis is system persona:\n%s\n", ret)
 
 	responseSchema := &genai.Schema{
 		Type: genai.TypeObject,
