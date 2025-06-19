@@ -58,7 +58,7 @@ func init() {
 
 func NewMemoryService(acc *AccountService, gemini *GeminiService) *MemoryService {
 	return &MemoryService{
-		maxCount:       10,
+		maxCount:       20,
 		expireDuration: 30 * 24 * time.Hour,
 		minImportance:  5,
 		Account:        acc,
@@ -179,20 +179,29 @@ func (ms *MemoryService) Read(acc *model.Account, keyword ...string) ([]*Memory,
 
 	if len(keyword) > 0 && keyword[0] != "" {
 		if cfg != nil && cfg.Memory.SharedMemory {
-			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE (mem_key LIKE ? OR content LIKE ?) ORDER BY updated_at;"
+			query = `SELECT
+				m.id, a.author, m.mem_key, m.content, m.importance, m.created_at, m.updated_at
+			FROM memory AS m
+			JOIN accounts AS a ON m.user_id = a.id
+			WHERE m.mem_key LIKE ? OR m.content LIKE ?
+			ORDER BY
+				CASE WHEN m.user_id = ? THEN 0 ELSE 1 END,
+				m.importance DESC,
+				m.updated_at DESC
+			LIMIT 20;`
 			searchTerm := "%" + keyword[0] + "%"
-			args = []any{searchTerm, searchTerm}
+			args = []any{searchTerm, searchTerm, acc.Id}
 		} else {
-			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? AND (mem_key LIKE ? OR content LIKE ?) ORDER BY updated_at;"
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? AND (mem_key LIKE ? OR content LIKE ?) ORDER BY updated_at LIMIT 20;"
 			searchTerm := "%" + keyword[0] + "%"
 			args = []any{acc.Id, searchTerm, searchTerm}
 		}
 	} else {
 		if cfg != nil && cfg.Memory.SharedMemory {
-			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory ORDER BY updated_at;"
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory ORDER BY updated_at LIMIT 20;"
 			args = []any{}
 		} else {
-			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? ORDER BY updated_at;"
+			query = "SELECT id, user_id, mem_key, content, importance, created_at, updated_at FROM memory WHERE user_id = ? ORDER BY updated_at LIMIT 20;"
 			args = []any{acc.Id}
 		}
 	}
