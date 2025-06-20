@@ -84,6 +84,7 @@ func (cc *ChatController) getFileData(url string) ([]byte, string, error) {
 }
 
 func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (string, []*genai.Part, error) {
+	cnf := config.Load()
 	var parts []*genai.Part
 
 	id := fmt.Sprintf("<USER_PROFILE>\nUser's name is %s and ID is %s.\n</USER_PROFILE>\n\n", req.Author, req.Id)
@@ -97,11 +98,16 @@ func (cc *ChatController) composePrompt(req *ChatData, acc *model.Account) (stri
 	memories, _ := cc.Memory.Read(acc)
 	mem := ""
 	if len(memories) > 0 {
-		mem += "<USER_MEMORY>\n"
+		mem += "<KUMA_MEMORY>\n"
 		for _, m := range memories {
+			if cnf.Memory.SharedMemory {
+				mem += fmt.Sprintf("- [%s] %s (기억 제공자: %s, 중요도: %d)\n", m.MemKey, m.Content, m.UserID, m.Importance)
+				continue
+			}
+
 			mem += fmt.Sprintf("- [%s] %s (중요도: %d)\n", m.MemKey, m.Content, m.Importance)
 		}
-		mem += "</USER_MEMORY>\n\n"
+		mem += "</KUMA_MEMORY>\n\n"
 	}
 
 	hist, _ := cc.History.Load(acc, 15, req.Info.NSFW)

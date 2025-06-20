@@ -185,7 +185,6 @@ func (ms *MemoryService) Read(acc *model.Account, keyword ...string) ([]*Memory,
 			JOIN accounts AS a ON m.user_id = a.id
 			WHERE m.mem_key LIKE ? OR m.content LIKE ?
 			ORDER BY
-				CASE WHEN m.user_id = ? THEN 0 ELSE 1 END,
 				m.importance DESC,
 				m.updated_at DESC
 			LIMIT 20;`
