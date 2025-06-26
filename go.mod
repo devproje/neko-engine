@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-sql-driver/mysql v1.9.2
 	github.com/pelletier/go-toml/v2 v2.2.4
-	google.golang.org/genai v1.6.0
+	google.golang.org/genai v1.13.0
 )
 
 require (

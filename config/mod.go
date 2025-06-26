@@ -13,7 +13,6 @@ type Config struct {
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
 	Gemini   GeminiConfig   `toml:"gemini"`
-	Memory   MemoryConfig   `toml:"memory"`
 }
 
 type BotConfig struct {
@@ -39,10 +38,6 @@ type DatabaseConfig struct {
 
 type GeminiConfig struct {
 	Token string `toml:"token"`
-}
-
-type MemoryConfig struct {
-	SharedMemory bool `toml:"shared-memory"`
 }
 
 type PromptConfig struct {
@@ -74,9 +69,6 @@ password = "<mariadb_password>"
 
 [gemini]
 token = ""
-
-[memory]
-shared-memory = false
 `
 	MODEL_DEFAULT_BUF = `model = "gemini-2.5-pro-preview-06-05"
 default = "<general_prompt>"
@@ -123,22 +115,4 @@ func Load() *Config {
 	}
 
 	return &config
-}
-
-func LoadPrompt() *PromptConfig {
-	buf, err := os.ReadFile(filepath.Join(ConfigPath, "prompt.toml"))
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "prompt.toml is not found!\n")
-		_ = os.WriteFile(filepath.Join(ConfigPath, "prompt.toml"), []byte(MODEL_DEFAULT_BUF), 0644)
-
-		return nil
-	}
-
-	var prompt PromptConfig
-	if err = toml.Unmarshal(buf, &prompt); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-		return nil
-	}
-
-	return &prompt
 }
