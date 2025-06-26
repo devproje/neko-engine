@@ -1,13 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/devproje/commando"
 	"github.com/devproje/commando/types"
+	"github.com/devproje/neko-engine/common"
+	"github.com/devproje/neko-engine/internal"
 )
 
 func serve(n *commando.Node) error {
+	sl := common.New()
+
+	internal.NewInternalServer(sl)
 	return nil
 }
 
@@ -20,4 +26,9 @@ func main() {
 		Short: []string{"d"},
 		Type:  types.BOOLEAN,
 	})
+
+	if err := command.Execute(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		return
+	}
 }

@@ -19,7 +19,11 @@ type NKFile struct {
 	} `toml:"prompt"`
 }
 
-func Read(persona string) (*NKFile, error) {
+func NewPromptService() *PromptService {
+	return &PromptService{}
+}
+
+func (*PromptService) Read(persona string) (*NKFile, error) {
 	filename := fmt.Sprintf("%s.nkfile", persona)
 	raw, err := os.ReadFile(filepath.Join(config.ConfigPath, "prompt", filename))
 	if err != nil {

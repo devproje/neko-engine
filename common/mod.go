@@ -1,9 +1,25 @@
 package common
 
+import (
+	"github.com/devproje/neko-engine/common/controller"
+	"github.com/devproje/neko-engine/common/service"
+)
+
 type ServiceLoader struct {
-	// TODO: add service here
+	Chat   *controller.ChatController
+	Prompt *service.PromptService
+	Gemini *service.GeminiService
 }
 
 func New() *ServiceLoader {
-	return &ServiceLoader{}
+	gemini := service.NewGeminiService()
+	prompt := service.NewPromptService()
+
+	chat := controller.NewChatController(gemini, prompt)
+
+	return &ServiceLoader{
+		Chat:   chat,
+		Prompt: prompt,
+		Gemini: gemini,
+	}
 }
