@@ -5,25 +5,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CheckBot(ctx *gin.Context) bool {
+func CheckBot(ctx *gin.Context) {
 	cnf := config.Load()
-	key := ctx.GetHeader("X-BOT-API-KEY")
-	if key == "" {
-		ctx.AbortWithStatusJSON(403, gin.H{
-			"errno": "this features can use only discord bot",
-		})
-
-		return false
-	}
-
-	if key != cnf.Server.Secret {
+	if cnf.Server.Secret != ctx.GetHeader("X-BOT-API-KEY") {
 		ctx.AbortWithStatusJSON(401, gin.H{
-			"errno": "secret key is not matches",
+			"errno": "only bot can use this api",
 		})
 
-		return false
+		return
 	}
 
 	ctx.Next()
-	return true
 }

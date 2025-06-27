@@ -2,6 +2,7 @@
 .idea
 .vscode/
 *.swp
+bak/
 
 # Finder (MacOS) folder config
 .DS_Store
@@ -9,15 +10,11 @@
 # configure
 config.toml
 config.*.toml
-!config.sample.toml
+!config.sample.tomlZ
 
 *.bak
-prompt.txt
-prompt-bak/
-prompt-*.txt
-prompt.*.bak
-prompt.toml
-!prompt.sample.toml
+*.nkfile
+!sample.nkfile
 
 neko-engine
 neko-data/
