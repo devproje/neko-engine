@@ -6,20 +6,27 @@ import (
 )
 
 type ServiceLoader struct {
-	Chat   *controller.ChatController
-	Prompt *service.PromptService
-	Gemini *service.GeminiService
+	Acc     *controller.AccountController
+	Chat    *controller.ChatController
+	Account *service.AccountService
+	Gemini  *service.GeminiService
+	Prompt  *service.PromptService
 }
 
 func New() *ServiceLoader {
+	account := service.NewAccountService()
 	gemini := service.NewGeminiService()
+	memory := service.NewMemoryService()
 	prompt := service.NewPromptService()
 
-	chat := controller.NewChatController(gemini, prompt)
+	acc := controller.NewAccountController(account)
+	chat := controller.NewChatController(account, gemini, memory, prompt)
 
 	return &ServiceLoader{
-		Chat:   chat,
-		Prompt: prompt,
-		Gemini: gemini,
+		Acc:     acc,
+		Chat:    chat,
+		Account: account,
+		Prompt:  prompt,
+		Gemini:  gemini,
 	}
 }

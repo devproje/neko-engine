@@ -70,8 +70,9 @@ password = "<mariadb_password>"
 [gemini]
 token = ""
 `
-	MODEL_DEFAULT_BUF = `model = "gemini-2.5-pro-preview-06-05"
+	MODEL_DEFAULT_BUF = `model = "gemini-2.5-pro"
 default = "<general_prompt>"
+
 # NSFW only prompt. If you set this variable to empty, it will automatically fallback to the default prompt.
 nsfw = ""
 `
@@ -80,7 +81,34 @@ nsfw = ""
 var (
 	Debug      bool
 	ConfigPath string
+
+	Version   string
+	Branch    string
+	Hash      string
+	BuildTime string
+	GoVersion string
+	Channel   string
 )
+
+type VersionInfo struct {
+	Version   string `json:"version"`
+	Branch    string `json:"branch"`
+	Hash      string `json:"hash"`
+	BuildTime string `json:"build_time"`
+	GoVersion string `json:"go_version"`
+	Channel   string `json:"channel"`
+}
+
+func GetVersionInfo() VersionInfo {
+	return VersionInfo{
+		Version:   Version,
+		Branch:    Branch,
+		Hash:      Hash,
+		BuildTime: BuildTime,
+		GoVersion: GoVersion,
+		Channel:   Channel,
+	}
+}
 
 func init() {
 	ConfigPath = "./neko-data"
