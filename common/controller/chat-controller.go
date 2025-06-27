@@ -121,7 +121,7 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 	}
 
 	role, _ := cc.Account.GetRoleById(account.RoleID)
-	if account.Count+1 > role.Limit {
+	if account.Count+1 > role.Limit && account.RoleID != 1 {
 		ctx.JSON(403, gin.H{
 			"errno": "You have reached your chat limit for this role.",
 		})
