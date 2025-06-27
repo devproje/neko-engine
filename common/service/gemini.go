@@ -36,10 +36,13 @@ func (*GeminiService) SendPrompt(system, model string, prompts []*genai.Content)
 				},
 			},
 			Tools: []*genai.Tool{
-				{GoogleSearch: &genai.GoogleSearch{}},
+				{
+					GoogleSearch: &genai.GoogleSearch{},
+					URLContext:   &genai.URLContext{},
+				},
 			},
 			Temperature: func() *float32 {
-				var ret float32 = 0.23
+				var ret float32 = 0.5
 				return &ret
 			}(),
 			MaxOutputTokens: 15000,
