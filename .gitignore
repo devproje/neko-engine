@@ -3,6 +3,7 @@
 .vscode/
 *.swp
 bak/
+dist/
 
 # Finder (MacOS) folder config
 .DS_Store
@@ -18,3 +19,6 @@ config.*.toml
 
 neko-engine
 neko-data/
+
+# Test coverage
+coverage.out

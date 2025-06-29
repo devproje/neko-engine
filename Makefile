@@ -1,144 +1,167 @@
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0")
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.0.0")
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GO_VERSION := $(shell go version | cut -d' ' -f3)
 
 BINARY_NAME := neko-engine
 MAIN_PATH := ./cmd
 
+DIST_DIR := dist
+BUILD_DIR := build
+
+TC_BUILD_NUMBER ?= 0
+TC_BUILD_BRANCH ?= $(BRANCH)
+
+RELEASE_CHANNEL := $(shell if [ "$(BRANCH)" = "master" ]; then echo "stable"; elif [ "$(BRANCH)" = "nightly" ]; then echo "nightly"; else echo "dev"; fi)
+
+VERSION_SUFFIX := $(shell if [ "$(RELEASE_CHANNEL)" = "stable" ]; then echo ""; elif [ "$(RELEASE_CHANNEL)" = "nightly" ]; then echo "-nightly.$$(date +%Y%m%d)"; else echo "-dev.$(HASH)"; fi)
+
+FULL_VERSION := $(VERSION)$(VERSION_SUFFIX)
+ifneq ($(TC_BUILD_NUMBER),0)
+	FULL_VERSION := $(VERSION)$(VERSION_SUFFIX).$(TC_BUILD_NUMBER)
+endif
+
 LDFLAGS := -X main.version=$(FULL_VERSION) \
            -X main.branch=$(BRANCH) \
            -X main.hash=$(HASH) \
            -X main.buildTime=$(BUILD_TIME) \
            -X main.goVersion=$(GO_VERSION) \
+           -X main.buildNumber=$(TC_BUILD_NUMBER) \
            -X main.channel=$(RELEASE_CHANNEL)
 
-BUILD_FLAGS := -ldflags "$(LDFLAGS)"
+BUILD_FLAGS := -ldflags "$(LDFLAGS)" -trimpath
+RELEASE_FLAGS := -ldflags "$(LDFLAGS) -s -w" -trimpath
 
-.PHONY: all build clean install test fmt vet mod-tidy help
+LINUX_PLATFORMS := linux/amd64 linux/arm64
+DARWIN_PLATFORMS := darwin/amd64 darwin/arm64
+WINDOWS_PLATFORMS := windows/amd64 windows/arm64
+ALL_PLATFORMS := $(LINUX_PLATFORMS) $(DARWIN_PLATFORMS) $(WINDOWS_PLATFORMS)
+
+.PHONY: all build clean test lint check linux-build darwin-build windows-build cross-compile artifacts release version ci-prepare ci-build ci-test ci-artifacts ci help
 
 all: build
 
 build:
-	@echo "Building $(BINARY_NAME)..."
+	@echo "Building $(BINARY_NAME) (dev)..."
 	@go build $(BUILD_FLAGS) -o $(BINARY_NAME) $(MAIN_PATH)
 
 clean:
-	@echo "Cleaning..."
+	@echo "Cleaning build artifacts..."
 	@rm -f $(BINARY_NAME)
-	@go clean
-
-install:
-	@echo "Installing $(BINARY_NAME)..."
-	@go install $(BUILD_FLAGS) $(MAIN_PATH)
+	@rm -rf $(DIST_DIR) $(BUILD_DIR)
+	@go clean -cache -modcache -testcache
 
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -v -race -coverprofile=coverage.out ./...
 
-fmt:
-	@echo "Formatting code..."
-	@go fmt ./...
-
-vet:
-	@echo "Vetting code..."
+lint:
+	@echo "Running linter..."
 	@go vet ./...
-
-mod-tidy:
-	@echo "Tidying modules..."
+	@go fmt ./...
 	@go mod tidy
 
-help:
-	@echo "Available targets:"
-	@echo "  build     - Build the binary"
-	@echo "  clean     - Clean build artifacts"
-	@echo "  install   - Install the binary"
-	@echo "  test      - Run tests"
-	@echo "  fmt       - Format code"
-	@echo "  vet       - Vet code"
-	@echo "  mod-tidy  - Tidy modules"
-	@echo "  tag-patch    - Create patch version tag (v1.0.X) [master only]"
-	@echo "  tag-minor    - Create minor version tag (v1.X.0) [master only]"
-	@echo "  tag-major    - Create major version tag (vX.0.0) [master only]"
-	@echo "  release      - Build release for current channel"
-	@echo "  version-info - Show detailed version information"
-	@echo "  help         - Show this help"
-	@echo ""
-	@echo "Release Channels:"
-	@echo "  master/main  -> stable (v1.0.0)"
-	@echo "  nightly      -> nightly (v1.0.0-nightly.20240101)"
-	@echo "  dev/develop  -> dev (v1.0.0-dev.abc1234)"
+check: lint test
+	@echo "All checks passed"
 
-# Git tag-based version control and release channels
-CURRENT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-CURRENT_VERSION := $(shell echo $(CURRENT_TAG) | sed 's/^v//')
+linux-build:
+	@echo "Building for Linux platforms..."
+	@mkdir -p $(DIST_DIR)
+	@for platform in $(LINUX_PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building for $$GOOS/$$GOARCH..."; \
+		GOOS=$$GOOS GOARCH=$$GOARCH CGO_ENABLED=0 go build $(RELEASE_FLAGS) \
+			-o $(DIST_DIR)/$(BINARY_NAME)-$$GOOS-$$GOARCH $(MAIN_PATH); \
+	done
 
-# Release channel configuration
-RELEASE_CHANNEL := $(shell \
-	case "$(BRANCH)" in \
-		master|main) echo "stable" ;; \
-		nightly) echo "nightly" ;; \
-		dev|develop) echo "dev" ;; \
-		*) echo "dev" ;; \
-	esac)
+darwin-build:
+	@echo "Building for macOS platforms..."
+	@mkdir -p $(DIST_DIR)
+	@for platform in $(DARWIN_PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building for $$GOOS/$$GOARCH..."; \
+		GOOS=$$GOOS GOARCH=$$GOARCH CGO_ENABLED=0 go build $(RELEASE_FLAGS) \
+			-o $(DIST_DIR)/$(BINARY_NAME)-$$GOOS-$$GOARCH $(MAIN_PATH); \
+	done
 
-# Channel-specific version suffix
-VERSION_SUFFIX := $(shell \
-	case "$(RELEASE_CHANNEL)" in \
-		stable) echo "" ;; \
-		nightly) echo "-nightly.$(shell date +%Y%m%d)" ;; \
-		dev) echo "-dev.$(HASH)" ;; \
-		*) echo "-dev.$(HASH)" ;; \
-	esac)
+windows-build:
+	@echo "Building for Windows platforms..."
+	@mkdir -p $(DIST_DIR)
+	@for platform in $(WINDOWS_PLATFORMS); do \
+		GOOS=$$(echo $$platform | cut -d'/' -f1); \
+		GOARCH=$$(echo $$platform | cut -d'/' -f2); \
+		echo "Building for $$GOOS/$$GOARCH..."; \
+		GOOS=$$GOOS GOARCH=$$GOARCH CGO_ENABLED=0 go build $(RELEASE_FLAGS) \
+			-o $(DIST_DIR)/$(BINARY_NAME)-$$GOOS-$$GOARCH.exe $(MAIN_PATH); \
+	done
 
-FULL_VERSION := $(VERSION)$(VERSION_SUFFIX)
+cross-compile: linux-build darwin-build windows-build
+	@echo "Cross-compilation completed for all platforms"
 
-tag-patch:
-	@echo "Current version: $(CURRENT_TAG)"
-	@if [ "$(BRANCH)" != "master" ] && [ "$(BRANCH)" != "main" ]; then \
-		echo "Error: Tags can only be created from master/main branch. Current branch: $(BRANCH)"; \
-		exit 1; \
-	fi
-	@NEW_VERSION=$$(echo $(CURRENT_VERSION) | awk -F. '{$$3++; print $$1"."$$2"."$$3}'); \
-	echo "Creating patch tag: v$$NEW_VERSION"; \
-	git tag -a "v$$NEW_VERSION" -m "Release v$$NEW_VERSION"; \
-	echo "Tag v$$NEW_VERSION created"
+artifacts: cross-compile
+	@echo "Binaries ready in $(DIST_DIR)/"
+	@ls -la $(DIST_DIR)/
 
-tag-minor:
-	@echo "Current version: $(CURRENT_TAG)"
-	@if [ "$(BRANCH)" != "master" ] && [ "$(BRANCH)" != "main" ]; then \
-		echo "Error: Tags can only be created from master/main branch. Current branch: $(BRANCH)"; \
-		exit 1; \
-	fi
-	@NEW_VERSION=$$(echo $(CURRENT_VERSION) | awk -F. '{$$2++; $$3=0; print $$1"."$$2"."$$3}'); \
-	echo "Creating minor tag: v$$NEW_VERSION"; \
-	git tag -a "v$$NEW_VERSION" -m "Release v$$NEW_VERSION"; \
-	echo "Tag v$$NEW_VERSION created"
+release: check artifacts
+	@echo "Release $(FULL_VERSION) completed successfully"
+	@ls -la $(DIST_DIR)/
 
-tag-major:
-	@echo "Current version: $(CURRENT_TAG)"
-	@if [ "$(BRANCH)" != "master" ] && [ "$(BRANCH)" != "main" ]; then \
-		echo "Error: Tags can only be created from master/main branch. Current branch: $(BRANCH)"; \
-		exit 1; \
-	fi
-	@NEW_VERSION=$$(echo $(CURRENT_VERSION) | awk -F. '{$$1++; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
-	echo "Creating major tag: v$$NEW_VERSION"; \
-	git tag -a "v$$NEW_VERSION" -m "Release v$$NEW_VERSION"; \
-	echo "Tag v$$NEW_VERSION created"
-
-release: build
-	@echo "Building release for channel: $(RELEASE_CHANNEL)"
-	@echo "Full version: $(FULL_VERSION)"
-	@echo "Branch: $(BRANCH)"
-	@echo "Release $(FULL_VERSION) built successfully"
-
-version-info:
+version:
 	@echo "Version: $(FULL_VERSION)"
 	@echo "Channel: $(RELEASE_CHANNEL)"
 	@echo "Branch: $(BRANCH)"
 	@echo "Hash: $(HASH)"
 	@echo "Build Time: $(BUILD_TIME)"
+	@echo "Build Number: $(TC_BUILD_NUMBER)"
 
-.PHONY: tag-patch tag-minor tag-major release version-info
+ci-prepare:
+	@echo "##teamcity[buildNumber '$(FULL_VERSION)']"
+	@echo "Preparing CI environment..."
+	@go version
+	@go env
+
+ci-build: ci-prepare cross-compile
+	@echo "CI build completed for all platforms"
+
+ci-test: ci-prepare test
+	@echo "##teamcity[publishArtifacts 'coverage.out']"
+	@echo "CI tests completed"
+
+ci-artifacts: ci-prepare artifacts
+	@echo "##teamcity[publishArtifacts '$(DIST_DIR)/*']"
+	@echo "CI binaries published"
+
+ci: ci-prepare check ci-build ci-test ci-artifacts
+	@echo "##teamcity[buildStatus text='Multi-platform build $(FULL_VERSION) completed successfully']"
+
+help:
+	@echo "Neko Engine Build System"
+	@echo ""
+	@echo "Development targets:"
+	@echo "  build        - Build binary for development"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  test         - Run tests with coverage"
+	@echo "  lint         - Run linter and formatter"
+	@echo "  check        - Run all quality checks"
+	@echo ""
+	@echo "Release targets:"
+	@echo "  linux-build  - Build for Linux platforms"
+	@echo "  darwin-build - Build for macOS platforms"
+	@echo "  windows-build- Build for Windows platforms"
+	@echo "  cross-compile- Build for all platforms"
+	@echo "  artifacts    - Prepare release binaries"
+	@echo "  release      - Full release build"
+	@echo ""
+	@echo "CI targets (TeamCity):"
+	@echo "  ci-prepare   - Prepare CI environment"
+	@echo "  ci-build     - CI build step (all platforms)"
+	@echo "  ci-test      - CI test step"
+	@echo "  ci-artifacts - CI artifact publishing"
+	@echo "  ci           - Full CI pipeline (all platforms)"
+	@echo ""
+	@echo "Utility:"
+	@echo "  version      - Show version information"
+	@echo "  help         - Show this help"
