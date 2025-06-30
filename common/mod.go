@@ -1,8 +1,13 @@
 package common
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/devproje/neko-engine/common/controller"
 	"github.com/devproje/neko-engine/common/service"
+	"github.com/devproje/neko-engine/config"
+	"github.com/devproje/neko-engine/util"
 )
 
 type ServiceLoader struct {
@@ -20,6 +25,17 @@ type ServiceLoader struct {
 }
 
 func New() *ServiceLoader {
+	cfg := config.Load()
+	if cfg != nil {
+		if err := util.InitializeRedis(&cfg.Redis); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to initialize Redis: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Redis connection established")
+	} else {
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to load config, Redis not initialized\n")
+	}
+
 	account := service.NewAccountService()
 	gemini := service.NewGeminiService()
 	memory := service.NewMemoryService()

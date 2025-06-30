@@ -224,7 +224,6 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 		return
 	}
 
-	// Ban 상태 확인
 	if account.Banned {
 		ctx.JSON(403, gin.H{
 			"errno": "Your account has been banned. Please contact support.",

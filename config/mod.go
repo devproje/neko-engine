@@ -12,6 +12,7 @@ type Config struct {
 	Bot      BotConfig      `toml:"bot"`
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
+	Redis    RedisConfig    `toml:"redis"`
 	Gemini   GeminiConfig   `toml:"gemini"`
 	Memory   MemoryConfig   `toml:"memory"`
 }
@@ -39,6 +40,13 @@ type DatabaseConfig struct {
 
 type GeminiConfig struct {
 	Token string `toml:"token"`
+}
+
+type RedisConfig struct {
+	Host     string `toml:"host"`
+	Port     int    `toml:"port"`
+	Password string `toml:"password"`
+	Database int    `toml:"database"`
 }
 
 type MemoryConfig struct {
@@ -78,6 +86,12 @@ port = 3306
 name = "neko-engine"
 username = "<mariadb_username>"
 password = "<mariadb_password>"
+
+[redis]
+host = "127.0.0.1"
+port = 6379
+password = ""
+database = 0
 
 [gemini]
 token = ""

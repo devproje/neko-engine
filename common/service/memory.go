@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/devproje/neko-engine/common/repository"
@@ -17,9 +18,9 @@ import (
 type MemoryService struct{}
 
 type MemoryData struct {
-	UID       string                `json:"user_id"`
-	Histories []*repository.History `json:"histories"`
-	Memories  []*repository.Memory  `json:"memories"`
+	UID       string                     `json:"user_id"`
+	Histories []*repository.RedisHistory `json:"histories"`
+	Memories  []*repository.Memory       `json:"memories"`
 }
 
 type ImportanceAnalysis struct {
@@ -48,14 +49,8 @@ func init() {
 }
 
 func (*MemoryService) LoadHistory(uid string) (*MemoryData, error) {
-	db := util.NewDatabase()
-	if err := db.Open(); err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	hist := repository.NewHistoryRepository(db)
-	history, err := hist.Read(uid, 20) // load last chats
+	redisHist := repository.NewRedisHistoryRepository()
+	history, err := redisHist.Read(uid, 20) // load last chats
 	if err != nil {
 		return nil, err
 	}
@@ -80,52 +75,30 @@ func (*MemoryService) AppendHistory(history *repository.History) error {
 		return err
 	}
 
-	return nil
+	redisHistory := &repository.RedisHistory{
+		UserID:    history.UserID,
+		Content:   history.Content,
+		Answer:    history.Answer,
+		CreatedAt: time.Now(),
+	}
+
+	redisHist := repository.NewRedisHistoryRepository()
+	return redisHist.Create(redisHistory)
 }
 
 func (*MemoryService) PurgeLast(uid string) error {
-	db := util.NewDatabase()
-	if err := db.Open(); err != nil {
-		return err
-	}
-	defer db.Close()
-
-	hist := repository.NewHistoryRepository(db)
-	if err := hist.PurgeOne(uid); err != nil {
-		return err
-	}
-
-	return nil
+	redisHist := repository.NewRedisHistoryRepository()
+	return redisHist.PurgeN(uid, 1)
 }
 
 func (*MemoryService) PurgeN(uid string, n int) error {
-	db := util.NewDatabase()
-	if err := db.Open(); err != nil {
-		return err
-	}
-	defer db.Close()
-
-	hist := repository.NewHistoryRepository(db)
-	if err := hist.PurgeN(uid, n); err != nil {
-		return err
-	}
-
-	return nil
+	redisHist := repository.NewRedisHistoryRepository()
+	return redisHist.PurgeN(uid, n)
 }
 
 func (*MemoryService) FlushHistory(uid string) error {
-	db := util.NewDatabase()
-	if err := db.Open(); err != nil {
-		return err
-	}
-	defer db.Close()
-
-	hist := repository.NewHistoryRepository(db)
-	if err := hist.Flush(uid); err != nil {
-		return err
-	}
-
-	return nil
+	redisHist := repository.NewRedisHistoryRepository()
+	return redisHist.Flush(uid)
 }
 
 func (*MemoryService) AnalyzeImportance(userMessage, botMessage string) (*ImportanceAnalysis, error) {
@@ -383,13 +356,11 @@ func (*MemoryService) SaveMemoryIfImportant(uid, userMessage, botMessage, provid
 func (*MemoryService) UpdateMemory(memory *repository.Memory) error {
 	ms := &MemoryService{}
 
-	// 텍스트 데이터 정리
 	memory.UserMessage = ms.cleanText(memory.UserMessage)
 	memory.BotMessage = ms.cleanText(memory.BotMessage)
 	memory.Summary = ms.cleanText(memory.Summary)
 	memory.ProviderUsername = ms.cleanText(memory.ProviderUsername)
 
-	// 키워드 정리
 	if memory.Keywords != "" {
 		keywords := strings.Split(memory.Keywords, ",")
 		cleanedKeywords := ms.cleanKeywords(keywords)
@@ -413,7 +384,6 @@ func (*MemoryService) UpdateMemory(memory *repository.Memory) error {
 func (*MemoryService) ReanalyzeAndUpdateMemory(memoryID uint) error {
 	ms := &MemoryService{}
 
-	// 기존 메모리 조회
 	db := util.NewDatabase()
 	if err := db.Open(); err != nil {
 		return err
@@ -426,14 +396,12 @@ func (*MemoryService) ReanalyzeAndUpdateMemory(memoryID uint) error {
 		return fmt.Errorf("memory not found: %v", err)
 	}
 
-	// 중요도 재분석
 	analysis, err := ms.AnalyzeImportance(memory.UserMessage, memory.BotMessage)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to reanalyze memory %d: %v\n", memoryID, err)
 		return err
 	}
 
-	// 새로운 분석 결과로 업데이트
 	memory.Importance = analysis.Importance
 	memory.Summary = ms.cleanText(analysis.Summary)
 	cleanedKeywords := ms.cleanKeywords(analysis.Keywords)
@@ -645,7 +613,7 @@ func (*MemoryService) FlushUserMemories(userID string) error {
 	return memRepo.Flush(userID)
 }
 
-func (*MemoryService) GetMemoryStats() (map[string]interface{}, error) {
+func (*MemoryService) GetMemoryStats() (map[string]any, error) {
 	db := util.NewDatabase()
 	if err := db.Open(); err != nil {
 		return nil, err
@@ -662,7 +630,7 @@ func (*MemoryService) GetMemoryStats() (map[string]interface{}, error) {
 	db.GetDB().Model(&repository.Memory{}).Select("COALESCE(AVG(importance), 0)").Row().Scan(&avgImportance)
 	db.GetDB().Model(&repository.Memory{}).Where("importance >= ?", 0.7).Count(&highImportanceCount)
 
-	var topProviders []map[string]interface{}
+	var topProviders []map[string]any
 	db.GetDB().Raw(`
 		SELECT provider_username, COUNT(*) as memory_count
 		FROM memories

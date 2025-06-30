@@ -18,9 +18,6 @@ type History struct {
 type HistoryRepository interface {
 	Create(history *History) error
 	Read(uid string, limit int) ([]*History, error)
-	PurgeOne(uid string) error
-	PurgeN(uid string, n int) error
-	Flush(uid string) error
 }
 
 type historyRepository struct {
@@ -43,33 +40,3 @@ func (repo *historyRepository) Read(uid string, limit int) ([]*History, error) {
 	return list, err
 }
 
-func (repo *historyRepository) PurgeOne(uid string) error {
-	var history History
-	err := repo.db.GetDB().Where("user_id = ?", uid).Order("created_at desc").Limit(1).First(&history).Error
-	if err != nil {
-		return err
-	}
-
-	return repo.db.GetDB().Delete(&history).Error
-}
-
-func (repo *historyRepository) PurgeN(uid string, n int) error {
-	var histories []*History
-	err := repo.db.GetDB().Where("user_id = ?", uid).Order("created_at desc").Limit(n).Find(&histories).Error
-	if err != nil {
-		return err
-	}
-	if len(histories) == 0 {
-		return nil
-	}
-	ids := make([]uint, len(histories))
-	for i, h := range histories {
-		ids[i] = h.ID
-	}
-
-	return repo.db.GetDB().Delete(&History{}, ids).Error
-}
-
-func (repo *historyRepository) Flush(uid string) error {
-	return repo.db.GetDB().Where("user_id = ?", uid).Delete(&History{}).Error
-}
