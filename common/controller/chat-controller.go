@@ -78,7 +78,7 @@ func (cc *ChatController) getFileData(url string) ([]byte, string, error) {
 
 func (cc *ChatController) detectUserMentions(content string) []string {
 	var mentions []string
-	
+
 	discordMentionRegex := regexp.MustCompile(`<@!?(\d+)>`)
 	discordMatches := discordMentionRegex.FindAllStringSubmatch(content, -1)
 	for _, match := range discordMatches {
@@ -86,7 +86,7 @@ func (cc *ChatController) detectUserMentions(content string) []string {
 			mentions = append(mentions, match[1])
 		}
 	}
-	
+
 	nicknameRegex := regexp.MustCompile(`@(\w+)`)
 	nicknameMatches := nicknameRegex.FindAllStringSubmatch(content, -1)
 	for _, match := range nicknameMatches {
@@ -94,7 +94,7 @@ func (cc *ChatController) detectUserMentions(content string) []string {
 			mentions = append(mentions, match[1])
 		}
 	}
-	
+
 	words := strings.Fields(content)
 	for _, word := range words {
 		cleanWord := strings.Trim(word, ".,!?;:\"'()[]{}")
@@ -102,7 +102,7 @@ func (cc *ChatController) detectUserMentions(content string) []string {
 			mentions = append(mentions, cleanWord)
 		}
 	}
-	
+
 	return mentions
 }
 
@@ -112,19 +112,19 @@ func (cc *ChatController) getUserInfo(mention string) string {
 		role, _ := cc.Account.GetRoleById(user.RoleID)
 		return fmt.Sprintf("User: %s (ID: %s, Role: %s)", user.Username, user.ID, role.Name)
 	}
-	
+
 	users, err := cc.Account.SearchUsersByUsername(mention)
 	if err != nil || len(users) == 0 {
 		return ""
 	}
-	
+
 	for _, user := range users {
 		if strings.EqualFold(user.Username, mention) {
 			role, _ := cc.Account.GetRoleById(user.RoleID)
 			return fmt.Sprintf("User: %s (ID: %s, Role: %s)", user.Username, user.ID, role.Name)
 		}
 	}
-	
+
 	firstUser := users[0]
 	role, _ := cc.Account.GetRoleById(firstUser.RoleID)
 	return fmt.Sprintf("User: %s (ID: %s, Role: %s)", firstUser.Username, firstUser.ID, role.Name)
@@ -143,7 +143,7 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 
 	if req.ReplyTo != nil {
 		prompt += "<REPLY_CONTEXT>\n"
-		prompt += fmt.Sprintf("This message is a reply to:\n")
+		prompt += "This message is a reply to:\n"
 		prompt += fmt.Sprintf("- Original Author: %s (ID: %s)\n", req.ReplyTo.Username, req.ReplyTo.UserID)
 		prompt += fmt.Sprintf("- Original Message: %s\n", req.ReplyTo.Content)
 		prompt += fmt.Sprintf("- Message ID: %s\n", req.ReplyTo.MessageID)
@@ -160,7 +160,7 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 				foundUsers = append(foundUsers, userInfo)
 			}
 		}
-		
+
 		if len(foundUsers) > 0 {
 			prompt += "<MENTIONED_USERS>\n"
 			prompt += "The following users were mentioned in the message:\n"
