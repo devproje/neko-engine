@@ -27,10 +27,18 @@ type ChatForm struct {
 	Content     string       `json:"content"`
 	Persona     string       `json:"persona"`
 	Attachments []Attachment `json:"attachments"`
+	ReplyTo     *ReplyInfo   `json:"reply_to,omitempty"`
 	Info        struct {
 		Content string `json:"chat"`
 		NSFW    bool   `json:"nsfw"`
 	} `json:"info"`
+}
+
+type ReplyInfo struct {
+	MessageID string `json:"message_id"`
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Content   string `json:"content"`
 }
 
 type Attachment struct {
@@ -133,17 +141,34 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 	prompt += fmt.Sprintf("<USER_PROFILE>\nCurrent user name is %s and ID is %s.</USER_PROFILE>\n\n", acc.Username, role.Name)
 	prompt += fmt.Sprintf("<CURRENT_CONTEXT>\nCurrent timestamp is %d\n</CURRENT_CONTEXT>\n\n", time.Now().Unix())
 
+	if req.ReplyTo != nil {
+		prompt += "<REPLY_CONTEXT>\n"
+		prompt += fmt.Sprintf("This message is a reply to:\n")
+		prompt += fmt.Sprintf("- Original Author: %s (ID: %s)\n", req.ReplyTo.Username, req.ReplyTo.UserID)
+		prompt += fmt.Sprintf("- Original Message: %s\n", req.ReplyTo.Content)
+		prompt += fmt.Sprintf("- Message ID: %s\n", req.ReplyTo.MessageID)
+		prompt += "Please acknowledge this reply context in your response.\n"
+		prompt += "</REPLY_CONTEXT>\n\n"
+	}
+
 	mentions := cc.detectUserMentions(req.Content)
 	if len(mentions) > 0 {
-		prompt += "<MENTIONED_USERS>\n"
-		prompt += "The following users were mentioned in the message:\n"
+		var foundUsers []string
 		for _, mention := range mentions {
 			userInfo := cc.getUserInfo(mention)
 			if userInfo != "" {
-				prompt += fmt.Sprintf("- %s\n", userInfo)
+				foundUsers = append(foundUsers, userInfo)
 			}
 		}
-		prompt += "</MENTIONED_USERS>\n\n"
+		
+		if len(foundUsers) > 0 {
+			prompt += "<MENTIONED_USERS>\n"
+			prompt += "The following users were mentioned in the message:\n"
+			for _, userInfo := range foundUsers {
+				prompt += fmt.Sprintf("- %s\n", userInfo)
+			}
+			prompt += "</MENTIONED_USERS>\n\n"
+		}
 	}
 
 	relevantMemories, err := cc.Memory.LoadRelevantMemories(acc.ID, req.Content, 10)

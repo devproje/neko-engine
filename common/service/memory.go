@@ -462,8 +462,14 @@ func (*MemoryService) LoadMemories(uid string, limit int) ([]*repository.Memory,
 	}
 	defer db.Close()
 
+	cnf := config.Load()
+	threshold := 0.0
+	if cnf != nil {
+		threshold = cnf.Memory.ImportanceThreshold
+	}
+
 	memRepo := repository.NewMemoryRepository(db)
-	return memRepo.ReadByImportance(uid, 0.5, limit)
+	return memRepo.ReadByImportance(uid, threshold, limit)
 }
 
 func (*MemoryService) LoadMemoryData(uid string) (*MemoryData, error) {
@@ -550,8 +556,14 @@ func (*MemoryService) SearchMemoriesByKeywords(uid, query string, limit int) ([]
 	}
 	defer db.Close()
 
+	cnf := config.Load()
+	threshold := 0.0
+	if cnf != nil {
+		threshold = cnf.Memory.ImportanceThreshold
+	}
+
 	memRepo := repository.NewMemoryRepository(db)
-	return memRepo.ReadByKeywordsAndImportance(uid, keywords, 0.5, limit)
+	return memRepo.ReadByKeywordsAndImportance(uid, keywords, threshold, limit)
 }
 
 func (*MemoryService) LoadRelevantMemories(uid, userMessage string, limit int) ([]*repository.Memory, error) {
@@ -567,14 +579,25 @@ func (*MemoryService) LoadRelevantMemories(uid, userMessage string, limit int) (
 	}
 	defer db.Close()
 
+	cnf := config.Load()
+	threshold := 0.0
+	highThreshold := 0.3
+	if cnf != nil {
+		threshold = cnf.Memory.ImportanceThreshold
+		highThreshold = cnf.Memory.ImportanceThreshold + 0.2
+		if highThreshold > 1.0 {
+			highThreshold = 1.0
+		}
+	}
+
 	memRepo := repository.NewMemoryRepository(db)
-	memories, err := memRepo.ReadByKeywordsAndImportance(uid, keywords, 0.5, limit)
+	memories, err := memRepo.ReadByKeywordsAndImportance(uid, keywords, threshold, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(memories) < limit/2 {
-		generalMemories, err := memRepo.ReadByImportance(uid, 0.7, limit-len(memories))
+		generalMemories, err := memRepo.ReadByImportance(uid, highThreshold, limit-len(memories))
 		if err == nil {
 			memories = append(memories, generalMemories...)
 		}
