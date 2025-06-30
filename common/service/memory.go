@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/devproje/neko-engine/common/repository"
 	"github.com/devproje/neko-engine/config"
@@ -287,6 +289,38 @@ func (ms *MemoryService) truncateText(text string, maxLen int) string {
 	return text[:maxLen] + "..."
 }
 
+func (ms *MemoryService) cleanText(text string) string {
+	if !utf8.ValidString(text) {
+		_, _ = fmt.Fprintf(os.Stderr, "Invalid UTF-8 string detected, cleaning...\n")
+		text = strings.ToValidUTF8(text, "?")
+	}
+
+	cleanRegex := regexp.MustCompile(`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]`)
+	text = cleanRegex.ReplaceAllString(text, "")
+
+	spaceRegex := regexp.MustCompile(`\s+`)
+	text = spaceRegex.ReplaceAllString(text, " ")
+
+	text = strings.TrimSpace(text)
+
+	if len(text) > 65535 {
+		text = text[:65532] + "..."
+	}
+
+	return text
+}
+
+func (ms *MemoryService) cleanKeywords(keywords []string) []string {
+	cleaned := make([]string, 0, len(keywords))
+	for _, keyword := range keywords {
+		cleanKeyword := ms.cleanText(keyword)
+		if cleanKeyword != "" && len(cleanKeyword) <= 100 { // 키워드 길이 제한
+			cleaned = append(cleaned, cleanKeyword)
+		}
+	}
+	return cleaned
+}
+
 func (*MemoryService) SaveMemoryIfImportant(uid, userMessage, botMessage, providerID, providerUsername string) error {
 	ms := &MemoryService{}
 	analysis, err := ms.AnalyzeImportance(userMessage, botMessage)
@@ -320,17 +354,28 @@ func (*MemoryService) SaveMemoryIfImportant(uid, userMessage, botMessage, provid
 	defer db.Close()
 
 	memRepo := repository.NewMemoryRepository(db)
-	keywordsStr := strings.Join(analysis.Keywords, ",")
+
+	cleanedUserMessage := ms.cleanText(userMessage)
+	cleanedBotMessage := ms.cleanText(botMessage)
+	cleanedSummary := ms.cleanText(analysis.Summary)
+	cleanedKeywords := ms.cleanKeywords(analysis.Keywords)
+	cleanedProviderUsername := ms.cleanText(providerUsername)
+
+	keywordsStr := strings.Join(cleanedKeywords, ",")
+
 	memory := &repository.Memory{
 		UserID:           uid,
-		UserMessage:      userMessage,
-		BotMessage:       botMessage,
+		UserMessage:      cleanedUserMessage,
+		BotMessage:       cleanedBotMessage,
 		Importance:       analysis.Importance,
-		Summary:          analysis.Summary,
+		Summary:          cleanedSummary,
 		Keywords:         keywordsStr,
 		ProviderID:       providerID,
-		ProviderUsername: providerUsername,
+		ProviderUsername: cleanedProviderUsername,
 	}
+
+	_, _ = fmt.Fprintf(os.Stderr, "Saving memory with cleaned data - Summary length: %d, Keywords: %d\n",
+		len(cleanedSummary), len(cleanedKeywords))
 
 	return memRepo.Create(memory)
 }
