@@ -50,7 +50,7 @@ func init() {
 
 func (*MemoryService) LoadHistory(uid string) (*MemoryData, error) {
 	redisHist := repository.NewRedisHistoryRepository()
-	history, err := redisHist.Read(uid, 20) // load last chats
+	history, err := redisHist.Read(uid, 20)
 	if err != nil {
 		return nil, err
 	}

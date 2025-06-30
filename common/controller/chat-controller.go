@@ -138,18 +138,20 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 	}
 
 	prompt += fmt.Sprintf("%s\n", system)
-	prompt += fmt.Sprintf("<USER_PROFILE>\nCurrent user name is %s and ID is %s.</USER_PROFILE>\n\n", acc.Username, role.Name)
-	prompt += fmt.Sprintf("<CURRENT_CONTEXT>\nCurrent timestamp is %d\n</CURRENT_CONTEXT>\n\n", time.Now().Unix())
 
 	if req.ReplyTo != nil {
 		prompt += "<REPLY_CONTEXT>\n"
-		prompt += "This message is a reply to:\n"
+		prompt += "🔴 CRITICAL: This message is a reply to:\n"
 		prompt += fmt.Sprintf("- Original Author: %s (ID: %s)\n", req.ReplyTo.Username, req.ReplyTo.UserID)
 		prompt += fmt.Sprintf("- Original Message: %s\n", req.ReplyTo.Content)
 		prompt += fmt.Sprintf("- Message ID: %s\n", req.ReplyTo.MessageID)
-		prompt += "Please acknowledge this reply context in your response.\n"
+		prompt += "You MUST acknowledge this reply context and respond accordingly.\n"
+		prompt += "This is critical - the user is replying to a specific message.\n"
 		prompt += "</REPLY_CONTEXT>\n\n"
 	}
+
+	prompt += fmt.Sprintf("<USER_PROFILE>\nCurrent user name is %s and ID is %s.</USER_PROFILE>\n\n", acc.Username, role.Name)
+	prompt += fmt.Sprintf("<CURRENT_CONTEXT>\nCurrent timestamp is %d\n</CURRENT_CONTEXT>\n\n", time.Now().Unix())
 
 	mentions := cc.detectUserMentions(req.Content)
 	if len(mentions) > 0 {
