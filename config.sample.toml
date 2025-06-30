@@ -16,6 +16,12 @@ model = "gemini-2.5-flash"
 importance-threshold = 0.5
 enable = true
 
+[redis]
+host = "127.0.0.1"
+port = 6379
+password = ""
+database = 0
+
 [database]
 host = "127.0.0.1"
 port = 3306
