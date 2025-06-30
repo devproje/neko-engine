@@ -35,10 +35,11 @@ type ChatForm struct {
 }
 
 type ReplyInfo struct {
-	MessageID string `json:"message_id"`
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-	Content   string `json:"content"`
+	MessageID   string       `json:"message_id"`
+	UserID      string       `json:"user_id"`
+	Username    string       `json:"username"`
+	Content     string       `json:"content"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 type Attachment struct {
@@ -145,6 +146,14 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 		prompt += fmt.Sprintf("- Original Author: %s (ID: %s)\n", req.ReplyTo.Username, req.ReplyTo.UserID)
 		prompt += fmt.Sprintf("- Original Message: %s\n", req.ReplyTo.Content)
 		prompt += fmt.Sprintf("- Message ID: %s\n", req.ReplyTo.MessageID)
+		
+		if len(req.ReplyTo.Attachments) > 0 {
+			prompt += "- Original message contained attachments:\n"
+			for _, attach := range req.ReplyTo.Attachments {
+				prompt += fmt.Sprintf("  * %s (%s)\n", attach.Filename, attach.ContentType)
+			}
+		}
+		
 		prompt += "You MUST acknowledge this reply context and respond accordingly.\n"
 		prompt += "This is critical - the user is replying to a specific message.\n"
 		prompt += "</REPLY_CONTEXT>\n\n"
@@ -252,6 +261,7 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 	input := make([]*genai.Content, 0)
 	parts := make([]*genai.Part, 0)
 
+	// 현재 메시지의 첨부파일 처리
 	if len(req.Attachments) != 0 {
 		for _, attach := range req.Attachments {
 			raw, mime, err := cc.getFileData(attach.URL)
@@ -264,9 +274,23 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 		}
 	}
 
+	// Reply-to 메시지의 첨부파일 처리
+	if req.ReplyTo != nil && len(req.ReplyTo.Attachments) != 0 {
+		for _, attach := range req.ReplyTo.Attachments {
+			raw, mime, err := cc.getFileData(attach.URL)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to load reply attachment: %v\n", err)
+				continue
+			}
+
+			parts = append(parts, genai.NewPartFromBytes(raw, mime))
+		}
+	}
+
 	input = append(input, genai.NewContentFromText(req.Content, genai.RoleUser))
 
-	if len(req.Attachments) != 0 {
+	// 첨부파일이 있으면 (현재 메시지 또는 reply-to 메시지)
+	if len(parts) > 0 {
 		input = append(input, genai.NewContentFromParts(parts, genai.RoleUser))
 	}
 
