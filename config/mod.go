@@ -13,6 +13,7 @@ type Config struct {
 	Server   ServerConfig   `toml:"server"`
 	Database DatabaseConfig `toml:"database"`
 	Gemini   GeminiConfig   `toml:"gemini"`
+	Memory   MemoryConfig   `toml:"memory"`
 }
 
 type BotConfig struct {
@@ -40,6 +41,12 @@ type GeminiConfig struct {
 	Token string `toml:"token"`
 }
 
+type MemoryConfig struct {
+	Model               string  `toml:"model"`
+	ImportanceThreshold float64 `toml:"importance-threshold"`
+	Enable              bool    `toml:"enable"`
+}
+
 type PromptConfig struct {
 	Model   string `toml:"model"`
 	Default string `toml:"default"`
@@ -59,6 +66,11 @@ port = 3000
 
 # please generate secret key and paste for gen-secret.sh script.
 secret = ""
+
+[memory]
+model = "gemini-2.5-flash"
+importance-threshold = 0.5
+enable = true
 
 [database]
 host = "127.0.0.1"

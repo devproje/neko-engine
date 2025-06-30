@@ -11,6 +11,11 @@ port = 3000
 # please generate secret key and paste for gen-secret.sh script.
 secret = ""
 
+[memory]
+model = "gemini-2.5-flash"
+importance-threshold = 0.5
+enable = true
+
 [database]
 host = "127.0.0.1"
 port = 3306
