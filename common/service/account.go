@@ -110,6 +110,7 @@ func (*AccountService) IncreaseCount(usr *repository.User) error {
 
 	user := repository.NewUserRepository(db)
 	usr.Count++
+	usr.Total++
 
 	if err := user.Update(usr); err != nil {
 		return err

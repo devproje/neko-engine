@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/devproje/neko-engine/common/repository"
@@ -44,7 +45,7 @@ func NewChatController(
 	memory *service.MemoryService,
 	prompt *service.PromptService,
 ) *ChatController {
-	return &ChatController{Gemini: gemini, Prompt: prompt, Account: account}
+	return &ChatController{Gemini: gemini, Prompt: prompt, Account: account, Memory: memory}
 }
 
 func (cc *ChatController) getFileData(url string) ([]byte, string, error) {
@@ -78,26 +79,37 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 	prompt += fmt.Sprintf("<USER_PROFILE>\nCurrent user name is %s and ID is %s.</USER_PROFILE>\n\n", acc.Username, role.Name)
 	prompt += fmt.Sprintf("<CURRENT_CONTEXT>\nCurrent timestamp is %d\n</CURRENT_CONTEXT>\n\n", time.Now().Unix())
 
-	mem, err := cc.Memory.LoadHistory(acc.ID)
+	relevantMemories, err := cc.Memory.LoadRelevantMemories(acc.ID, req.Content, 10)
+	if err == nil && len(relevantMemories) > 0 {
+		prompt += "<RELEVANT_MEMORIES>\n"
+		prompt += "The following are relevant memories from your previous conversations:\n"
+		for _, memory := range relevantMemories {
+			keywords := strings.Split(memory.Keywords, ",")
+			keywordStr := strings.Join(keywords, ", ")
+			prompt += fmt.Sprintf("- [Provided by: %s (ID: %s), Importance: %.2f, Keywords: %s] %s\n", 
+				memory.ProviderUsername, memory.ProviderID, memory.Importance, keywordStr, memory.Summary)
+		}
+		prompt += "</RELEVANT_MEMORIES>\n\n"
+	}
+
+	mem, err := cc.Memory.LoadMemoryData(acc.ID)
 	if err != nil {
 		return prompt
 	}
 
-	if len(mem.Histories) <= 0 {
-		return prompt
+	if len(mem.Histories) > 0 {
+		prompt += "You must leverage all available conversation context in chronological order (from past to present),\n"
+		prompt += "including previous dialogue and relevant metadata, to generate responses. \n"
+		prompt += "Ensure your output demonstrates understanding of the ongoing user intent, prior exchanges, and the current situation.\n"
+		prompt += "<HISTORY_METADATA>"
+		for _, hist := range mem.Histories {
+			prompt += fmt.Sprintf("- [%s] user: %s\n- [%s] bot: %s\n",
+				hist.CreatedAt, hist.Content,
+				hist.CreatedAt, hist.Answer,
+			)
+		}
+		prompt += "</HISTORY_METADATA>"
 	}
-
-	prompt += "You must leverage all available conversation context in chronological order (from past to present),\n"
-	prompt += "including previous dialogue and relevant metadata, to generate responses. \n"
-	prompt += "Ensure your output demonstrates understanding of the ongoing user intent, prior exchanges, and the current situation.\n"
-	prompt += "<HISTORY_METADATA>"
-	for _, hist := range mem.Histories {
-		prompt += fmt.Sprintf("- [%s] user: %s\n- [%s] bot: %s\n",
-			hist.CreatedAt, hist.Content,
-			hist.CreatedAt, hist.Answer,
-		)
-	}
-	prompt += "</HISTORY_METADATA>"
 
 	return prompt
 }
@@ -172,6 +184,12 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 		Content: req.Content,
 		Answer:  answer,
 	})
+
+	go func() {
+		if err := cc.Memory.SaveMemoryIfImportant(req.Id, req.Content, answer, account.ID, account.Username); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to save memory: %v\n", err)
+		}
+	}()
 
 	if err = cc.Account.IncreaseCount(account); err != nil {
 		ctx.JSON(500, gin.H{

@@ -29,12 +29,7 @@ func (*GeminiService) SendPrompt(system, model string, prompts []*genai.Content)
 		model,
 		prompts,
 		&genai.GenerateContentConfig{
-			SystemInstruction: &genai.Content{
-				Role: genai.RoleUser,
-				Parts: []*genai.Part{
-					{Text: system},
-				},
-			},
+			SystemInstruction: genai.NewContentFromText(system, genai.RoleUser),
 			Tools: []*genai.Tool{
 				{
 					GoogleSearch: &genai.GoogleSearch{},
