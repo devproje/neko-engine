@@ -65,14 +65,14 @@ func (m *memoryRepository) SearchByKeywords(uid string, keywords []string, limit
 	if len(keywords) == 0 {
 		return []*Memory{}, nil
 	}
-	
+
 	var memories []*Memory
 	query := m.db.GetDB().Where("user_id = ?", uid)
-	
+
 	for _, keyword := range keywords {
 		query = query.Where("keywords LIKE ?", "%"+keyword+"%")
 	}
-	
+
 	err := query.Order("importance desc, created_at desc").Limit(limit).Find(&memories).Error
 	return memories, err
 }
@@ -80,13 +80,13 @@ func (m *memoryRepository) SearchByKeywords(uid string, keywords []string, limit
 func (m *memoryRepository) ReadByKeywordsAndImportance(uid string, keywords []string, minImportance float64, limit int) ([]*Memory, error) {
 	var memories []*Memory
 	query := m.db.GetDB().Where("user_id = ? AND importance >= ?", uid, minImportance)
-	
+
 	if len(keywords) > 0 {
 		for _, keyword := range keywords {
 			query = query.Where("keywords LIKE ?", "%"+keyword+"%")
 		}
 	}
-	
+
 	err := query.Order("importance desc, created_at desc").Limit(limit).Find(&memories).Error
 	return memories, err
 }

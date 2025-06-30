@@ -68,3 +68,7 @@ func (ac *AccountController) FetchAccount(ctx *gin.Context) {
 		},
 	})
 }
+
+func (ac *AccountController) BanAccount(ctx *gin.Context) {
+
+}

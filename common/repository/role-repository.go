@@ -9,6 +9,7 @@ type Role struct {
 	Id    int    `gorm:"primaryKey"`
 	Name  string `gorm:"index"`
 	Limit int
+	Root  bool `gorm:"default:false"`
 	gorm.Model
 }
 

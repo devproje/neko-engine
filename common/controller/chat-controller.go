@@ -68,6 +68,60 @@ func (cc *ChatController) getFileData(url string) ([]byte, string, error) {
 	return data, mimeType, nil
 }
 
+func (cc *ChatController) detectUserMentions(content string) []string {
+	var mentions []string
+	
+	discordMentionRegex := regexp.MustCompile(`<@!?(\d+)>`)
+	discordMatches := discordMentionRegex.FindAllStringSubmatch(content, -1)
+	for _, match := range discordMatches {
+		if len(match) > 1 {
+			mentions = append(mentions, match[1])
+		}
+	}
+	
+	nicknameRegex := regexp.MustCompile(`@(\w+)`)
+	nicknameMatches := nicknameRegex.FindAllStringSubmatch(content, -1)
+	for _, match := range nicknameMatches {
+		if len(match) > 1 {
+			mentions = append(mentions, match[1])
+		}
+	}
+	
+	words := strings.Fields(content)
+	for _, word := range words {
+		cleanWord := strings.Trim(word, ".,!?;:\"'()[]{}")
+		if len(cleanWord) >= 3 && len(cleanWord) <= 32 {
+			mentions = append(mentions, cleanWord)
+		}
+	}
+	
+	return mentions
+}
+
+func (cc *ChatController) getUserInfo(mention string) string {
+	user, err := cc.Account.ReadUser(mention)
+	if err == nil {
+		role, _ := cc.Account.GetRoleById(user.RoleID)
+		return fmt.Sprintf("User: %s (ID: %s, Role: %s)", user.Username, user.ID, role.Name)
+	}
+	
+	users, err := cc.Account.SearchUsersByUsername(mention)
+	if err != nil || len(users) == 0 {
+		return ""
+	}
+	
+	for _, user := range users {
+		if strings.EqualFold(user.Username, mention) {
+			role, _ := cc.Account.GetRoleById(user.RoleID)
+			return fmt.Sprintf("User: %s (ID: %s, Role: %s)", user.Username, user.ID, role.Name)
+		}
+	}
+	
+	firstUser := users[0]
+	role, _ := cc.Account.GetRoleById(firstUser.RoleID)
+	return fmt.Sprintf("User: %s (ID: %s, Role: %s)", firstUser.Username, firstUser.ID, role.Name)
+}
+
 func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *repository.Role, persona *service.NKFile, req *ChatForm) string {
 	var prompt string
 	system := persona.Prompt.Default
@@ -79,6 +133,19 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 	prompt += fmt.Sprintf("<USER_PROFILE>\nCurrent user name is %s and ID is %s.</USER_PROFILE>\n\n", acc.Username, role.Name)
 	prompt += fmt.Sprintf("<CURRENT_CONTEXT>\nCurrent timestamp is %d\n</CURRENT_CONTEXT>\n\n", time.Now().Unix())
 
+	mentions := cc.detectUserMentions(req.Content)
+	if len(mentions) > 0 {
+		prompt += "<MENTIONED_USERS>\n"
+		prompt += "The following users were mentioned in the message:\n"
+		for _, mention := range mentions {
+			userInfo := cc.getUserInfo(mention)
+			if userInfo != "" {
+				prompt += fmt.Sprintf("- %s\n", userInfo)
+			}
+		}
+		prompt += "</MENTIONED_USERS>\n\n"
+	}
+
 	relevantMemories, err := cc.Memory.LoadRelevantMemories(acc.ID, req.Content, 10)
 	if err == nil && len(relevantMemories) > 0 {
 		prompt += "<RELEVANT_MEMORIES>\n"
@@ -86,7 +153,7 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 		for _, memory := range relevantMemories {
 			keywords := strings.Split(memory.Keywords, ",")
 			keywordStr := strings.Join(keywords, ", ")
-			prompt += fmt.Sprintf("- [Provided by: %s (ID: %s), Importance: %.2f, Keywords: %s] %s\n", 
+			prompt += fmt.Sprintf("- [Provided by: %s (ID: %s), Importance: %.2f, Keywords: %s] %s\n",
 				memory.ProviderUsername, memory.ProviderID, memory.Importance, keywordStr, memory.Summary)
 		}
 		prompt += "</RELEVANT_MEMORIES>\n\n"
@@ -128,6 +195,14 @@ func (cc *ChatController) SendChat(ctx *gin.Context) {
 	if err != nil {
 		ctx.JSON(401, gin.H{
 			"errno": "Please sign up before using the bot!",
+		})
+		return
+	}
+
+	// Ban 상태 확인
+	if account.Banned {
+		ctx.JSON(403, gin.H{
+			"errno": "Your account has been banned. Please contact support.",
 		})
 		return
 	}

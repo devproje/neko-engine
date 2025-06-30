@@ -380,6 +380,81 @@ func (*MemoryService) SaveMemoryIfImportant(uid, userMessage, botMessage, provid
 	return memRepo.Create(memory)
 }
 
+func (*MemoryService) UpdateMemory(memory *repository.Memory) error {
+	ms := &MemoryService{}
+
+	// 텍스트 데이터 정리
+	memory.UserMessage = ms.cleanText(memory.UserMessage)
+	memory.BotMessage = ms.cleanText(memory.BotMessage)
+	memory.Summary = ms.cleanText(memory.Summary)
+	memory.ProviderUsername = ms.cleanText(memory.ProviderUsername)
+
+	// 키워드 정리
+	if memory.Keywords != "" {
+		keywords := strings.Split(memory.Keywords, ",")
+		cleanedKeywords := ms.cleanKeywords(keywords)
+		memory.Keywords = strings.Join(cleanedKeywords, ",")
+	}
+
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return err
+	}
+	defer db.Close()
+
+	memRepo := repository.NewMemoryRepository(db)
+
+	_, _ = fmt.Fprintf(os.Stderr, "Updating memory with cleaned data - ID: %d, Summary length: %d\n",
+		memory.ID, len(memory.Summary))
+
+	return memRepo.Update(memory)
+}
+
+func (*MemoryService) ReanalyzeAndUpdateMemory(memoryID uint) error {
+	ms := &MemoryService{}
+
+	// 기존 메모리 조회
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return err
+	}
+	defer db.Close()
+
+	memRepo := repository.NewMemoryRepository(db)
+	var memory repository.Memory
+	if err := db.GetDB().First(&memory, memoryID).Error; err != nil {
+		return fmt.Errorf("memory not found: %v", err)
+	}
+
+	// 중요도 재분석
+	analysis, err := ms.AnalyzeImportance(memory.UserMessage, memory.BotMessage)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to reanalyze memory %d: %v\n", memoryID, err)
+		return err
+	}
+
+	// 새로운 분석 결과로 업데이트
+	memory.Importance = analysis.Importance
+	memory.Summary = ms.cleanText(analysis.Summary)
+	cleanedKeywords := ms.cleanKeywords(analysis.Keywords)
+	memory.Keywords = strings.Join(cleanedKeywords, ",")
+
+	_, _ = fmt.Fprintf(os.Stderr, "Reanalyzed memory %d - New importance: %.2f\n", memoryID, analysis.Importance)
+
+	return memRepo.Update(&memory)
+}
+
+func (*MemoryService) DeleteMemory(memoryID uint) error {
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return err
+	}
+	defer db.Close()
+
+	memRepo := repository.NewMemoryRepository(db)
+	return memRepo.Delete(memoryID)
+}
+
 func (*MemoryService) LoadMemories(uid string, limit int) ([]*repository.Memory, error) {
 	db := util.NewDatabase()
 	if err := db.Open(); err != nil {
@@ -433,7 +508,7 @@ Return only a JSON array of strings: ["keyword1", "keyword2", "keyword3"]`
 	}
 
 	cnf := config.Load()
-	model := "gemini-1.5-flash" // 기본값
+	model := "gemini-2.5-flash"
 	if cnf != nil && cnf.Memory.Model != "" {
 		model = cnf.Memory.Model
 	}
@@ -506,4 +581,78 @@ func (*MemoryService) LoadRelevantMemories(uid, userMessage string, limit int) (
 	}
 
 	return memories, nil
+}
+
+func (*MemoryService) LoadAllMemories(limit, offset int) ([]*repository.Memory, error) {
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var memories []*repository.Memory
+	err := db.GetDB().Preload("User").Limit(limit).Offset(offset).Order("importance desc, created_at desc").Find(&memories).Error
+	return memories, err
+}
+
+func (*MemoryService) GetMemoryByID(memoryID uint) (*repository.Memory, error) {
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var memory repository.Memory
+	err := db.GetDB().Preload("User").First(&memory, memoryID).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &memory, nil
+}
+
+func (*MemoryService) FlushUserMemories(userID string) error {
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return err
+	}
+	defer db.Close()
+
+	memRepo := repository.NewMemoryRepository(db)
+	return memRepo.Flush(userID)
+}
+
+func (*MemoryService) GetMemoryStats() (map[string]interface{}, error) {
+	db := util.NewDatabase()
+	if err := db.Open(); err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var totalMemories int64
+	var totalHistories int64
+	var avgImportance float64
+	var highImportanceCount int64
+
+	db.GetDB().Model(&repository.Memory{}).Count(&totalMemories)
+	db.GetDB().Model(&repository.History{}).Count(&totalHistories)
+	db.GetDB().Model(&repository.Memory{}).Select("COALESCE(AVG(importance), 0)").Row().Scan(&avgImportance)
+	db.GetDB().Model(&repository.Memory{}).Where("importance >= ?", 0.7).Count(&highImportanceCount)
+
+	var topProviders []map[string]interface{}
+	db.GetDB().Raw(`
+		SELECT provider_username, COUNT(*) as memory_count
+		FROM memories
+		GROUP BY provider_username
+		ORDER BY memory_count DESC
+		LIMIT 10
+	`).Scan(&topProviders)
+
+	return map[string]interface{}{
+		"total_memories":        totalMemories,
+		"total_histories":       totalHistories,
+		"average_importance":    avgImportance,
+		"high_importance_count": highImportanceCount,
+		"top_providers":         topProviders,
+	}, nil
 }
