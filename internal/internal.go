@@ -19,8 +19,10 @@ func NewInternalServer(sl *common.ServiceLoader) {
 	go func() {
 		for {
 			now := time.Now()
-			next := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Add(24 * time.Hour)
-			time.Sleep(time.Until(next))
+			time.Sleep(1 * time.Second)
+			if now.Hour() != 0 || now.Minute() != 0 || now.Second() != 0 {
+				continue
+			}
 
 			fmt.Println("Resetting count at midnight...")
 			if err := sl.Acc.Acc.ResetCount(); err != nil {
