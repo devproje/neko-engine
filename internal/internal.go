@@ -18,8 +18,8 @@ func NewInternalServer(sl *common.ServiceLoader) {
 
 	go func() {
 		for {
-			now := time.Now()
 			time.Sleep(1 * time.Second)
+			now := time.Now()
 			if now.Hour() != 0 || now.Minute() != 0 || now.Second() != 0 {
 				continue
 			}
@@ -27,6 +27,8 @@ func NewInternalServer(sl *common.ServiceLoader) {
 			fmt.Println("Resetting count at midnight...")
 			if err := sl.Acc.Acc.ResetCount(); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
+			} else {
+				fmt.Println("Successfully reset all user counts")
 			}
 		}
 	}()

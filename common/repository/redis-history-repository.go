@@ -72,7 +72,7 @@ func (r *redisHistoryRepository) Create(history *RedisHistory) error {
 
 	key := r.getHistoryKey(history.UserID)
 	score := float64(history.CreatedAt.Unix())
-	
+
 	return r.client.ZAdd(r.ctx, key, redis.Z{
 		Score:  score,
 		Member: data,
@@ -81,7 +81,7 @@ func (r *redisHistoryRepository) Create(history *RedisHistory) error {
 
 func (r *redisHistoryRepository) Read(uid string, limit int) ([]*RedisHistory, error) {
 	key := r.getHistoryKey(uid)
-	
+
 	results, err := r.client.ZRevRange(r.ctx, key, 0, int64(limit-1)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from Redis: %w", err)
@@ -101,7 +101,7 @@ func (r *redisHistoryRepository) Read(uid string, limit int) ([]*RedisHistory, e
 
 func (r *redisHistoryRepository) Delete(uid string, historyID string) error {
 	key := r.getHistoryKey(uid)
-	
+
 	allMembers, err := r.client.ZRange(r.ctx, key, 0, -1).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get all members: %w", err)
@@ -122,18 +122,18 @@ func (r *redisHistoryRepository) Delete(uid string, historyID string) error {
 
 func (r *redisHistoryRepository) PurgeN(uid string, n int) error {
 	key := r.getHistoryKey(uid)
-	
+
 	return r.client.ZRemRangeByRank(r.ctx, key, -int64(n), -1).Err()
 }
 
 func (r *redisHistoryRepository) Flush(uid string) error {
 	key := r.getHistoryKey(uid)
 	counterKey := fmt.Sprintf("history_counter:%s", uid)
-	
+
 	pipe := r.client.Pipeline()
 	pipe.Del(r.ctx, key)
 	pipe.Del(r.ctx, counterKey)
 	_, err := pipe.Exec(r.ctx)
-	
+
 	return err
 }

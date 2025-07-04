@@ -54,5 +54,5 @@ func (repo *userRepository) Delete(id string) error {
 }
 
 func (repo *userRepository) ResetAll() error {
-	return repo.db.GetDB().Model(&User{}).Update("count", 0).Error
+	return repo.db.GetDB().Model(&User{}).Where("1 = 1").Update("count", 0).Error
 }

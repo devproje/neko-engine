@@ -146,14 +146,14 @@ func (cc *ChatController) composeSystemPrompt(acc *repository.User, role *reposi
 		prompt += fmt.Sprintf("- Original Author: %s (ID: %s)\n", req.ReplyTo.Username, req.ReplyTo.UserID)
 		prompt += fmt.Sprintf("- Original Message: %s\n", req.ReplyTo.Content)
 		prompt += fmt.Sprintf("- Message ID: %s\n", req.ReplyTo.MessageID)
-		
+
 		if len(req.ReplyTo.Attachments) > 0 {
 			prompt += "- Original message contained attachments:\n"
 			for _, attach := range req.ReplyTo.Attachments {
 				prompt += fmt.Sprintf("  * %s (%s)\n", attach.Filename, attach.ContentType)
 			}
 		}
-		
+
 		prompt += "You MUST acknowledge this reply context and respond accordingly.\n"
 		prompt += "This is critical - the user is replying to a specific message.\n"
 		prompt += "</REPLY_CONTEXT>\n\n"

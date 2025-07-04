@@ -119,7 +119,7 @@ func (*AccountService) IncreaseCount(usr *repository.User) error {
 	return nil
 }
 
-func (*AccountService) ResetCount() error {
+func (as *AccountService) ResetCount() error {
 	db := util.NewDatabase()
 	if err := db.Open(); err != nil {
 		return err

@@ -39,4 +39,3 @@ func (repo *historyRepository) Read(uid string, limit int) ([]*History, error) {
 	slices.Reverse(list)
 	return list, err
 }
-
